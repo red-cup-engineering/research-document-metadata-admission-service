@@ -1,0 +1,13 @@
+{
+  "name": "@red-cup-engineering/research-document-metadata-admission-service",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Admits research-document metadata and projects its declared document relations without parsing a carrier or maintaining an index.",
+  "exports": {
+    ".": "./src/research-document-metadata.mjs",
+    "./project-relations": "./src/project-research-document-relations.mjs",
+    "./audit-citations": "./src/audit-research-document-citations.mjs"
+  },
+  "files": ["src", "README.md", "package.json"],
+  "engines": { "node": ">=24.2.0" }
+}
