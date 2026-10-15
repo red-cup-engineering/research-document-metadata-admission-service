@@ -16,3 +16,21 @@ import { projectResearchDocumentRelations } from "@red-cup-engineering/research-
 const metadata = admitResearchDocumentMetadata({ id: "relational-research", title: "Relational research", authors: ["Emsenn"] });
 const relations = projectResearchDocumentRelations(metadata.value);
 ```
+
+## Recovered citation export capabilities
+
+The archive's citation-key generator and BibTeX renderer, previously trapped in
+`emsenn/emsenn-archive-code` at commit `3c69d5cf9d3bec484f1dc22067ed9623b1bab7c6`, are now
+native functions here: `./citation-key` and `./bibtex`.
+The original source file Git blob IDs are `c1dd943e17ccd4af52fb8e0621065eb67860eaf7`
+(citekey.py) and `ccf528bb52ca91b5f7a57c49bc08c32eba7d8074` (bibtex.py). The adaptation
+reuses this owner's already-admitted metadata records, rather than importing
+a second YAML corpus loader or ownership registry.
+
+Keys are *proposals*; callers decide whether to adopt them. BibTeX is only a
+deterministic projection from explicit external citation records: identical
+repeated references are deduplicated, conflicting uses of one key refuse, and
+malformed/unsafe fields refuse rather than silently inventing truth. No
+publication, experimental conclusion or installed authoring workflow is
+implied by source qualification.
+

@@ -6,8 +6,20 @@
   "exports": {
     ".": "./src/research-document-metadata.mjs",
     "./project-relations": "./src/project-research-document-relations.mjs",
-    "./audit-citations": "./src/audit-research-document-citations.mjs"
+    "./audit-citations": "./src/audit-research-document-citations.mjs",
+    "./citation-key": "./src/research-citation-key.mjs",
+    "./bibtex": "./src/research-document-bibtex.mjs"
   },
-  "files": ["src", "README.md", "package.json"],
-  "engines": { "node": ">=24.2.0" }
+  "files": [
+    "src",
+    "README.md",
+    "package.json"
+  ],
+  "engines": {
+    "node": ">=24.2.0"
+  },
+  "scripts": {
+    "check": "node --check src/research-citation-key.mjs && node --check src/research-document-bibtex.mjs && node --check test/archive-citations-receiving.test.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
 }
