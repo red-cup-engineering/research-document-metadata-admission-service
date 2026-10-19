@@ -21,5 +21,9 @@
   "scripts": {
     "check": "node --check src/research-citation-key.mjs && node --check src/research-document-bibtex.mjs && node --check test/archive-citations-receiving.test.mjs",
     "test": "node --test test/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/red-cup-engineering/research-document-metadata-admission-service.git"
   }
 }
