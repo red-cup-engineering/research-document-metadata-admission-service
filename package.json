@@ -8,7 +8,8 @@
     "./project-relations": "./src/project-research-document-relations.mjs",
     "./audit-citations": "./src/audit-research-document-citations.mjs",
     "./citation-key": "./src/research-citation-key.mjs",
-    "./bibtex": "./src/research-document-bibtex.mjs"
+    "./bibtex": "./src/research-document-bibtex.mjs",
+    "./ro-crate": "./src/project-research-document-ro-crate.mjs"
   },
   "files": [
     "src",
@@ -19,7 +20,7 @@
     "node": ">=24.2.0"
   },
   "scripts": {
-    "check": "node --check src/research-citation-key.mjs && node --check src/research-document-bibtex.mjs && node --check test/archive-citations-receiving.test.mjs",
+    "check": "node --check src/research-citation-key.mjs && node --check src/research-document-bibtex.mjs && node --check test/archive-citations-receiving.test.mjs && node --check src/project-research-document-ro-crate.mjs && node --check test/research-ro-crate-projection.test.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "repository": {
