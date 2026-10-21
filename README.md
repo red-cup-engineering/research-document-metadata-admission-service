@@ -34,3 +34,29 @@ malformed/unsafe fields refuse rather than silently inventing truth. No
 publication, experimental conclusion or installed authoring workflow is
 implied by source qualification.
 
+## Source-owned RO-Crate 1.3 projection
+
+The original document metadata admission package now also exports a *pure research-object description* at `./ro-crate` for reproducible mathematical papers. It consumes the normal `admitResearchDocumentMetadata` result and an **explicit, measured file inventory**. No file IO, Markdown parsing, DOI issuance, editorial rights admission, web deployment, ActivityPub distribution, or independent delivery receipt is hidden inside the projection.
+
+```js
+import {admitResearchDocumentMetadata} from "@red-cup-engineering/research-document-metadata-admission-service";
+import {projectAdmittedResearchRoCrate} from "@red-cup-engineering/research-document-metadata-admission-service/ro-crate";
+
+const accepted = admitResearchDocumentMetadata({
+  id: "feathers-fleets-farms",
+  title: "Feathers, Fleets, and Farms: Fabricating FOAM with Finite Fibers",
+  authors: ["emsenn"],
+  document_type: "paper",
+  date_created: "2026-10-20",
+  status: "working",
+});
+const projected = projectAdmittedResearchRoCrate(accepted,{
+  description: "Conditional finite-fleet capacity theorem and bounded reproducibility checks.",
+  files: [{path:"manuscript.md",encodingFormat:"text/markdown",
+    sha256:"a".repeat(64),contentSize:123}],
+});
+```
+
+The repeated-`a` digest above is **only a documentation example**. A real caller must independently measure original bytes, associate the stable source revision with the inventory and verify that every listed file actually exists and matches its declared SHA-256. The exporter rejects unsafe paths, duplicate items, malformed digests, non-HTTPS source URLs, invalid document metadata and duplicate cited keys. A separate caller may use `projectResearchDocumentRoCrate(rawMetadata, options)` to invoke the native admission step automatically.
+
+The output uses [RO-Crate 1.3](https://www.researchobject.org/ro-crate/specification/1.3/) descriptor, Dataset, File, Person and CreativeWork nodes. Published DOI, license, published date or public URL are **not fabricated**; only explicitly declared metadata is projected. A passing source test never asserts Science/editorial acceptance or an installed public publisher. This service provides reusable **research metadata**. For actual artifact creation reuse [Red Cup's Pandoc projector](https://github.com/red-cup-engineering/project-document-through-pandoc-service); public release and syndication remain with [Causeway Public Web](https://github.com/causeway-services/public-web-services-section/blob/main/sites/README.md).
