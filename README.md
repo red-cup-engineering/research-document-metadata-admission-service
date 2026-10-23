@@ -41,6 +41,12 @@ malformed/unsafe fields refuse rather than silently inventing truth. No
 publication, experimental conclusion or installed authoring workflow is
 implied by source qualification.
 
+## Bidirectional citation-integrity assay
+
+The existing `./audit-citations` export accepts an **explicit decoded research-document collection** and checks both original `cites_internal` and `cited_by_internal` claims. A forward link must have the corresponding inverse, and a reverse link must point to a real authoring source that actually cites the subject. Duplicate document ids are **ambiguous**, never silently resolved to the last input. Returned `invalid`, `broken`, `asymmetric`, `inverseBroken`, `inverseAsymmetric`, `duplicates`, and `ambiguous` readings preserve different evidence failures.
+
+This is a source-graph integrity test, **not** a test that the cited study exists outside the supplied corpus, that any scientific claim is true, that the source has publication rights, or that a paper is world-class. The owning Science source selects the corpus and its research method; a downstream editor and reader independently receive any publication. Run `node --test test/research-citation-integrity.test.mjs` at the package's declared Node version before native receiving.
+
 ## Source-owned RO-Crate 1.3 projection
 
 The original document metadata admission package now also exports a *pure research-object description* at `./ro-crate` for reproducible mathematical papers. It consumes the normal `admitResearchDocumentMetadata` result and an **explicit, measured file inventory**. No file IO, Markdown parsing, DOI issuance, editorial rights admission, web deployment, ActivityPub distribution, or independent delivery receipt is hidden inside the projection.
