@@ -205,18 +205,25 @@ export function verifyResearchRoCratePayloads(projected,payloads=[]){
    const part=payloads[i],name=part?.path;
    if(!safePath(name)){fault('/payloads/'+i+'/path','unsafe or absent payload path');continue;}
    if(observed.has(name)){fault('/payloads/'+i+'/path','same payload provided twice');continue;}
-   if(!(part.bytes instanceof Uint8Array)){fault('/payloads/'+i+'/bytes','pass actual Uint8Array or Buffer bytes');continue;}
+   const whole=part.bytes instanceof Uint8Array;
+   const pieces=Array.isArray(part.chunks)&&part.chunks.length>0&&part.chunks.every(c=>c instanceof Uint8Array);
+   if(whole===pieces||part.bytes!==undefined&&!whole||part.chunks!==undefined&&!pieces){
+     fault('/payloads/'+i+'/bytes','supply exactly one actual Uint8Array/Buffer or nonempty sequence of byte chunks');continue;
+   }
    if(!expected.has(name)){fault('/payloads/'+i+'/path','unlisted payload cannot be declared verified');continue;}
-   observed.set(name,part.bytes);
+   observed.set(name,whole?[part.bytes]:part.chunks);
  }
  for(const [path,claim] of expected){
-   const bytes=observed.get(path);
-   if(!bytes){fault('/files/'+path,'declared file content was not supplied');continue;}
-   const sha256=createHash('sha256').update(bytes).digest('hex');
-   if(bytes.byteLength!==claim.bytes)fault('/files/'+path+'/contentSize','actual byte length differs from declared receipt');
+   const chunks=observed.get(path);
+   if(!chunks){fault('/files/'+path,'declared file content was not supplied');continue;}
+   const digest=createHash('sha256');
+   let byteLength=0;
+   for(const chunk of chunks){digest.update(chunk);byteLength+=chunk.byteLength;}
+   const sha256=digest.digest('hex');
+   if(!Number.isSafeInteger(byteLength)||byteLength!==claim.bytes)fault('/files/'+path+'/contentSize','actual byte length differs from declared receipt');
    if(sha256!==claim.sha256)fault('/files/'+path+'/sha256','actual byte digest differs from declared receipt');
-   if(bytes.byteLength===claim.bytes&&sha256===claim.sha256){
-     readback.push(Object.freeze({path,sha256,bytes:bytes.byteLength}));
+   if(byteLength===claim.bytes&&sha256===claim.sha256){
+     readback.push(Object.freeze({path,sha256,bytes:byteLength}));
    }
  }
  if(expected.size===0)fault('/root/hasPart','no valid file receipts to assay');
