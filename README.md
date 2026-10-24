@@ -47,6 +47,38 @@ The existing `./audit-citations` export accepts an **explicit decoded research-d
 
 This is a source-graph integrity test, **not** a test that the cited study exists outside the supplied corpus, that any scientific claim is true, that the source has publication rights, or that a paper is world-class. The owning Science source selects the corpus and its research method; a downstream editor and reader independently receive any publication. Run `node --test test/research-citation-integrity.test.mjs` at the package's declared Node version before native receiving.
 
+## Executed process provenance through the same RO-Crate owner
+
+For an **actually observed computational operation** the existing `./ro-crate` projection may now receive an optional `processRun` alongside the existing explicit byte-measured `files`. It projects a [Process Run Crate 0.6](https://www.researchobject.org/workflow-run-crate/profiles/process_run_crate/) `CreateAction` linked to the original root Dataset, an explicitly named `SoftwareApplication`, its declared executor, inventoried inputs and inventoried outputs. The standard profile extends [RO-Crate 1.3](https://www.researchobject.org/ro-crate/specification/1.3/); no second paper registry or run executor is created. Omitting `processRun` leaves ordinary research-paper projections unchanged.
+
+**Required evidence from Coesite or another real research executor:** a source-revision-bound instrument with a declared version and exact HTTPS source, observed start/end timestamps with timezone, method/run identity, an explicit completed or failed state, and actual separately inventoried input/result payloads. The exporter rejects an unobserved timestamp, an unknown instrument version, nonexistent input/output file references, duplicated paths, a `CreateAction` that claims to create its own input in place, an invented success state and failure records without an error. A failure **may** have no results; the recorded process history must not be erased just because the experiment failed.
+
+```js
+import {projectResearchDocumentRoCrate} from "@red-cup-engineering/research-document-metadata-admission-service/ro-crate";
+
+const crate = projectResearchDocumentRoCrate(
+  {id:"method-bench",title:"Instrument bench",status:"working",document_type:"experiment"},
+  {description:"Reproducible source-bound synthetic instrument method, not a verified publication",
+    files:[
+      {path:"settings.json",encodingFormat:"application/json",sha256:"a".repeat(64),contentSize:40},
+      {path:"observations.json",encodingFormat:"application/json",sha256:"b".repeat(64),contentSize:90}
+    ],
+    processRun:{
+      kind:"research.process-run/v1",id:"example-001",name:"Bounded model observation",
+      description:"Synthetic documentation fixture; no actual execution or authorship claims",
+      tool:{name:"Example engine",sourceUrl:"https://example.org/source/one",version:"1.0.0"},
+      agent:{type:"Organization",name:"Example executor"},
+      startedAt:"2026-10-23T20:00:00Z",endedAt:"2026-10-23T20:01:00Z",
+      status:"completed",inputs:["settings.json"],outputs:["observations.json"]
+    }
+  }
+);
+```
+
+The repeated `a`/`b` digests, timestamps and example version above are **invented code-fixture values**, never scientific observations, a package/version attestation, authorized authorship or public research. Consumers must independently read artifact bytes, obtain true run-source and installed-version receipts, compare results and validate RO-Crate syntax/graph requirements. This projection does not reproduce a run, sign an execution, grant release rights, discover a DOI or attest to an independent researcher.
+
+**Observed first blocked receiver:** the source-owning Coesite [Holofoam four-seed preflight](https://github.com/coesite-operations/operations-services-section/blob/main/services/research-operations-services-section/data/records/2026-10-23-holofoam-v4-instrument-preflight.json) has useful content-addressed physical-model histories and negative controls. Its record **does not have authenticated exact execution clocks or an independently observed installed instrument version**, and it has no separately inventoried input and output payload files. It must therefore **not** be silently promoted to a compliant Process Run Crate. Preserve that authentic, limited source record and improve *upstream native experiment receipts* before using this profile for live study publication. Governance Science's `Empty Overseer` remains an unrun separate institutional experiment.
+
 ## Source-owned RO-Crate 1.3 projection
 
 The original document metadata admission package now also exports a *pure research-object description* at `./ro-crate` for reproducible mathematical papers. It consumes the normal `admitResearchDocumentMetadata` result and an **explicit, measured file inventory**. No file IO, Markdown parsing, DOI issuance, editorial rights admission, web deployment, ActivityPub distribution, or independent delivery receipt is hidden inside the projection.
