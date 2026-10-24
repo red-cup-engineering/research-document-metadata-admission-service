@@ -103,3 +103,20 @@ test('all source payload file receipts must match; one good file cannot hide one
   assert.equal(r.verifiedFiles.length,1);
   assert.ok(r.failures.some(f=>f.path.includes('config.json')));
 });
+
+test('chunked byte views reproduce the same SHA-256 and byte length without concatenation',()=>{
+  const pieces=[
+    bytes.subarray(0,3),
+    bytes.subarray(3,17),
+    bytes.subarray(17)
+  ];
+  const result=verify(make(),[{path:'observed/preflight.json',chunks:pieces}]);
+  assert.equal(result.ok,true);
+  assert.deepEqual(result.verifiedFiles,[{path:'observed/preflight.json',sha256:digest(bytes),bytes:bytes.byteLength}]);
+});
+test('bad chunk, missing chunk and ambiguous whole plus chunk inputs are refused',()=>{
+  const a=bytes.subarray(0,bytes.length-1),b=bytes.subarray(bytes.length-1);
+  assert.equal(verify(make(),[{path:'observed/preflight.json',chunks:[a]}]).ok,false);
+  assert.equal(verify(make(),[{path:'observed/preflight.json',chunks:[a,'not-bytes']}]).ok,false);
+  assert.equal(verify(make(),[{path:'observed/preflight.json',bytes,chunks:[a,b]}]).ok,false);
+});
