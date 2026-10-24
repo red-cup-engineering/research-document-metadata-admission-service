@@ -8,6 +8,7 @@
 import { admitResearchDocumentMetadata } from './research-document-metadata.mjs';
 
 const PROFILE='https://w3id.org/ro/crate/1.3';
+const PROCESS_PROFILE='https://w3id.org/ro/wfrun/process/0.6';
 const CONTEXT=PROFILE+'/context';
 const HASH=/^[a-f0-9]{64}$/u;
 const isRecord=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -26,13 +27,51 @@ function httpsUrl(value){
   catch{return false;}
 }
 
+/** Project actual supplied computational process evidence into the Process Run Crate
+ * 0.6 profile without executing or authenticating a source claim. All run inputs
+ * and results refer to separately inventoried payloads in this same crate.
+ */
+function projectProcessRun(run,knownPaths){
+  if(!isRecord(run)||run.kind!=='research.process-run/v1')return refuse('/processRun/kind','expected the research process-run evidence profile');
+  if(!named(run.id)||! /^[a-z0-9][a-z0-9._-]{0,127}$/u.test(run.id))return refuse('/processRun/id','run id must be a bounded local identifier');
+  if(!named(run.name)||!named(run.description))return refuse('/processRun/name','a named, described execution is required');
+  const input=isRecord(run.tool)?run.tool:{};
+  if(!named(input.name)||!httpsUrl(input.sourceUrl)||!named(input.version)||/^(unknown|unverified|tbd)$/iu.test(input.version))return refuse('/processRun/tool','real source locator and declared software version are required');
+  const agent=isRecord(run.agent)?run.agent:{};
+  if(!named(agent.name)||!['Person','Organization'].includes(agent.type))return refuse('/processRun/agent','identify an actual declared executor and its type');
+  const iso=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+  const instant=x=>named(x)&&iso.test(x)&&Number.isFinite(Date.parse(x));
+  if(!instant(run.startedAt)||!instant(run.endedAt)||Date.parse(run.endedAt)<Date.parse(run.startedAt))return refuse('/processRun/time','source-observed run start/end timestamps with offsets are required');
+  if(!['completed','failed'].includes(run.status))return refuse('/processRun/status','execution disposition must be completed or failed');
+  if(run.status==='failed'&&!named(run.error))return refuse('/processRun/error','a failed execution needs its observed error');
+  if(run.status==='completed'&&run.error!==undefined)return refuse('/processRun/error','completed execution cannot claim a failure error');
+  const validFileRefs=(list,empty)=>Array.isArray(list)&&(empty||list.length>0)&&new Set(list).size===list.length&&list.every(p=>typeof p==='string'&&knownPaths.has(p));
+  if(!validFileRefs(run.inputs,true))return refuse('/processRun/inputs','all run inputs must be unique, measured crate payloads');
+  if(!validFileRefs(run.outputs,run.status==='failed'))return refuse('/processRun/outputs','all run outputs must be unique, measured crate payloads');
+  if(run.inputs.some(p=>run.outputs.includes(p)))return refuse('/processRun/outputs','CreateAction cannot claim to create its input payload in place');
+  const runId='#run-'+run.id,toolId='#run-tool',agentId='#run-executor';
+  return Object.freeze({ok:true,entities:Object.freeze([
+    Object.freeze({'@id':PROCESS_PROFILE,'@type':'CreativeWork',name:'Process Run Crate profile 0.6'}),
+    Object.freeze({'@id':toolId,'@type':'SoftwareApplication',name:input.name,url:input.sourceUrl,softwareVersion:input.version}),
+    Object.freeze({'@id':agentId,'@type':agent.type,name:agent.name}),
+    Object.freeze({'@id':runId,'@type':'CreateAction',name:run.name,description:run.description,
+      startTime:run.startedAt,endTime:run.endedAt,
+      instrument:ref(toolId),agent:ref(agentId),
+      ...(run.inputs.length?{object:run.inputs.map(ref)}:{}),
+      ...(run.outputs.length?{result:run.outputs.map(ref)}:{}),
+      actionStatus:ref(run.status==='completed'?'https://schema.org/CompletedActionStatus':'https://schema.org/FailedActionStatus'),
+      ...(run.status==='failed'?{error:run.error}:{}),
+    }),
+  ]),runId});
+}
+
 /**
  * @param {object} admitted - The output of admitResearchDocumentMetadata.
  * @param {object} options - An explicit byte-measured payload inventory.
  * File hash syntax is checked; the digest's correspondence to bytes and
  * the legality/authority of publication require independent receivers.
  */
-export function projectAdmittedResearchRoCrate(admitted,{files,description,sourceUrl}={}){
+export function projectAdmittedResearchRoCrate(admitted,{files,description,sourceUrl,processRun}={}){
   if(!isRecord(admitted)||admitted.ok!==true||!isRecord(admitted.value)){
     return admitted?.ok===false&&admitted.refusal?admitted:refuse('/admitted','original research metadata admission is required');
   }
@@ -67,6 +106,8 @@ export function projectAdmittedResearchRoCrate(admitted,{files,description,sourc
     if(citationsSeen.has(v.key))return refuse('/cites_external/'+i+'/key','citation key collision');
     citationsSeen.add(v.key);
   }
+  const execution=processRun===undefined?null:projectProcessRun(processRun,seen);
+  if(execution!==null&&!execution.ok)return execution;
   const authors=m.authors.map((name,i)=>Object.freeze({'@id':'#author-'+(i+1),'@type':'Person',name}));
   const citations=cited.map((source,i)=>Object.freeze({
     '@id':'#citation-'+(i+1),'@type':'CreativeWork',name:source.title,
@@ -86,6 +127,7 @@ export function projectAdmittedResearchRoCrate(admitted,{files,description,sourc
     ...(authors.length?{author:authors.map(a=>ref(a['@id']))}:{}),
     ...(citations.length?{citation:citations.map(a=>ref(a['@id']))}:{}),
     hasPart:payload.map(f=>ref(f['@id'])),
+    ...(execution?{conformsTo:ref(PROCESS_PROFILE),mentions:[ref(execution.runId)]}:{}),
   });
   const descriptor=Object.freeze({
     '@id':'ro-crate-metadata.json','@type':'CreativeWork',
@@ -93,7 +135,7 @@ export function projectAdmittedResearchRoCrate(admitted,{files,description,sourc
   });
   return Object.freeze({ok:true,value:Object.freeze({
     '@context':CONTEXT,
-    '@graph':Object.freeze([descriptor,root,...payload,...authors,...citations]),
+    '@graph':Object.freeze([descriptor,root,...payload,...authors,...citations,...(execution?execution.entities:[])]),
   })});
 }
 
