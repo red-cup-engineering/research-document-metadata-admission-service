@@ -49,12 +49,16 @@ This is a source-graph integrity test, **not** a test that the cited study exist
 
 ## Verify actual research-object payloads
 
-The **same** `./ro-crate` entrypoint now exports `verifyResearchRoCratePayloads(projected, payloads)`. The receiving executor supplies the exact `Uint8Array` or Node `Buffer` bytes it actually read for **every** inventoried `File`, using the same relative `path` appearing in the research-object root `hasPart`. The function computes **SHA-256** using Node's native cryptography and compares the real byte length and digest against the original source-declared receipt. It refuses missing, extra, duplicated, unsafe or malformed payload paths, absent metadata entities, duplicate graph identities, malformed receipt digests/sizes, and corrupted actual bytes. It preserves precisely which files passed and which source constraints failed; it never silently converts a failed assay into a released artifact.
+The **same** `./ro-crate` entrypoint now exports `verifyResearchRoCratePayloads(projected, payloads)`. The receiving executor supplies the exact `Uint8Array` or Node `Buffer` bytes it actually read for **every** inventoried `File`, or a sequence of such byte chunks that can be hashed incrementally without concatenating a large research payload. Both forms use the same relative `path` appearing in the research-object root `hasPart`. The function computes **SHA-256** using Node's native cryptography and compares the real byte length and digest against the original source-declared receipt. It refuses missing, extra, duplicated, unsafe or malformed payload paths, absent metadata entities, duplicate graph identities, malformed receipt digests/sizes, and corrupted actual bytes. It preserves precisely which files passed and which source constraints failed; it never silently converts a failed assay into a released artifact.
 
 ```js
+import {verifyResearchRoCratePayloads} from "@red-cup-engineering/research-document-metadata-admission-service/ro-crate";
+
 const check = verifyResearchRoCratePayloads(projected, [
   {path:"observations.json",bytes:Buffer.from(actualObservedFileBytes)},
 ]);
+// Or, for a large payload supplied as chunks:
+// {path:"observations.json",chunks:[firstObservedBytes,secondObservedBytes]}
 ```
 
 The caller is responsible for obtaining `actualObservedFileBytes` from a **source-qualified and rights-admitted real file**. The code above is a **contract illustration**, not a fabricated observation. A declared SHA-256 field, a plausible Git blob ID, or a passing JSON-LD shape check does **not** establish that the underlying payload exists, has the claimed exact bytes, or can be publicly fetched. This operation checks only **supplied content integrity**. It does not authenticate the origin/provider, authorize public reuse, verify code execution, certify a scientific claim, mint a DOI or constitute independent scholarly replication. The Coesite Research Operations receiver and Causeway publisher still own those effects.
