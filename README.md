@@ -47,6 +47,22 @@ The existing `./audit-citations` export accepts an **explicit decoded research-d
 
 This is a source-graph integrity test, **not** a test that the cited study exists outside the supplied corpus, that any scientific claim is true, that the source has publication rights, or that a paper is world-class. The owning Science source selects the corpus and its research method; a downstream editor and reader independently receive any publication. Run `node --test test/research-citation-integrity.test.mjs` at the package's declared Node version before native receiving.
 
+## Verify actual research-object payloads
+
+The **same** `./ro-crate` entrypoint now exports `verifyResearchRoCratePayloads(projected, payloads)`. The receiving executor supplies the exact `Uint8Array` or Node `Buffer` bytes it actually read for **every** inventoried `File`, or a sequence of such byte chunks that can be hashed incrementally without concatenating a large research payload. Both forms use the same relative `path` appearing in the research-object root `hasPart`. The function computes **SHA-256** using Node's native cryptography and compares the real byte length and digest against the original source-declared receipt. It refuses missing, extra, duplicated, unsafe or malformed payload paths, absent metadata entities, duplicate graph identities, malformed receipt digests/sizes, and corrupted actual bytes. It preserves precisely which files passed and which source constraints failed; it never silently converts a failed assay into a released artifact.
+
+```js
+import {verifyResearchRoCratePayloads} from "@red-cup-engineering/research-document-metadata-admission-service/ro-crate";
+
+const check = verifyResearchRoCratePayloads(projected, [
+  {path:"observations.json",bytes:Buffer.from(actualObservedFileBytes)},
+]);
+// Or, for a large payload supplied as chunks:
+// {path:"observations.json",chunks:[firstObservedBytes,secondObservedBytes]}
+```
+
+The caller is responsible for obtaining `actualObservedFileBytes` from a **source-qualified and rights-admitted real file**. The code above is a **contract illustration**, not a fabricated observation. A declared SHA-256 field, a plausible Git blob ID, or a passing JSON-LD shape check does **not** establish that the underlying payload exists, has the claimed exact bytes, or can be publicly fetched. This operation checks only **supplied content integrity**. It does not authenticate the origin/provider, authorize public reuse, verify code execution, certify a scientific claim, mint a DOI or constitute independent scholarly replication. The Coesite Research Operations receiver and Causeway publisher still own those effects.
+
 ## Executed process provenance through the same RO-Crate owner
 
 For an **actually observed computational operation** the existing `./ro-crate` projection may now receive an optional `processRun` alongside the existing explicit byte-measured `files`. It projects a [Process Run Crate 0.6](https://www.researchobject.org/workflow-run-crate/profiles/process_run_crate/) `CreateAction` linked to the original root Dataset, an explicitly named `SoftwareApplication`, its declared executor, inventoried inputs and inventoried outputs. The standard profile extends [RO-Crate 1.3](https://www.researchobject.org/ro-crate/specification/1.3/); no second paper registry or run executor is created. Omitting `processRun` leaves ordinary research-paper projections unchanged.

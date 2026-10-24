@@ -6,6 +6,7 @@
  * Specification: https://www.researchobject.org/ro-crate/specification/1.3/
  */
 import { admitResearchDocumentMetadata } from './research-document-metadata.mjs';
+import { createHash } from 'node:crypto';
 
 const PROFILE='https://w3id.org/ro/crate/1.3';
 const PROCESS_PROFILE='https://w3id.org/ro/wfrun/process/0.6';
@@ -142,4 +143,91 @@ export function projectAdmittedResearchRoCrate(admitted,{files,description,sourc
 /** Convenience entry for decoded document metadata; owns no carrier parser. */
 export function projectResearchDocumentRoCrate(metadata, options={}){
   return projectAdmittedResearchRoCrate(admitResearchDocumentMetadata(metadata),options);
+}
+
+
+/** Independently calculate the digest/size of bytes actually supplied by a
+ * receiving caller. This verifies content integrity only; the executor who
+ * reads files must still prove source, permission, identity, and public reach.
+ * Never fabricate an absent file from its declared checksum.
+ *
+ * Accepts the native projection {ok:true,value:{'@graph':...}} or its JSON-LD
+ * value plus the caller's actual Uint8Array/Buffer content by exact relative
+ * path. No filesystem/network accesses, signature checks, or archival effects.
+ */
+export function verifyResearchRoCratePayloads(projected,payloads=[]){
+ const kind='research-ro-crate-byte-assay/v1';
+ const errors=[],readback=[];
+ const fault=(path,reason)=>errors.push(Object.freeze({path,reason}));
+ if(projected?.ok===false)return Object.freeze({kind,ok:false,verifiedFiles:Object.freeze([]),
+   failures:Object.freeze([Object.freeze({path:'/crate',reason:'the original metadata projection was refused'})]),
+   limit:'Bytes only; no scientific, identity, publication, licensing or external receiving authority.'});
+ const doc=projected?.ok===true?projected.value:projected;
+ if(!isRecord(doc)||doc['@context']!==CONTEXT||!Array.isArray(doc['@graph'])){
+   fault('/crate','an original RO-Crate 1.3 JSON-LD graph is required');
+   return Object.freeze({kind,ok:false,verifiedFiles:Object.freeze([]),failures:Object.freeze(errors),
+      limit:'Bytes only; no source ownership, publication or independent scientific assurance.'});
+ }
+ const graph=doc['@graph'],ids=new Map();
+ for(let i=0;i<graph.length;i++){
+   const e=graph[i];
+   if(!isRecord(e)||!named(e['@id'])){fault('/@graph/'+i,'every entity needs a valid @id');continue;}
+   if(ids.has(e['@id']))fault('/@graph/'+i,'duplicate entity identifier');
+   else ids.set(e['@id'],e);
+ }
+ const root=ids.get('./'),descriptor=ids.get('ro-crate-metadata.json');
+ if(!isRecord(root)||root['@type']!=='Dataset'||!Array.isArray(root.hasPart)){
+   fault('/root','root Dataset must enumerate all files in hasPart');
+ }
+ if(!isRecord(descriptor)||descriptor.about?.['@id']!=='./'||descriptor.conformsTo?.['@id']!==PROFILE){
+   fault('/descriptor','original RO-Crate metadata descriptor and profile are required');
+ }
+ const expected=new Map(),refs=Array.isArray(root?.hasPart)?root.hasPart:[];
+ for(let i=0;i<refs.length;i++){
+   const id=refs[i]?.['@id'],entry=ids.get(id);
+   if(!safePath(id)||!isRecord(entry)||!(entry['@type']==='File'||(Array.isArray(entry['@type'])&&entry['@type'].includes('File')))){
+     fault('/root/hasPart/'+i,'each listed payload must have a measured, safe File identity');
+     continue;
+   }
+   if(expected.has(id)){fault('/root/hasPart/'+i,'the same file is listed twice');continue;}
+   if(!HASH.test(entry.sha256??'')){fault('/files/'+id+'/sha256','declared digest must be a lowercase SHA-256');continue;}
+   const size=entry.contentSize;
+   if(!((typeof size==='string'&&/^(0|[1-9]\d*)$/u.test(size))||Number.isSafeInteger(size))){
+     fault('/files/'+id+'/contentSize','declared byte length must be an exact nonnegative integer');continue;
+   }
+   const count=Number(size);
+   if(!Number.isSafeInteger(count)||count<0){fault('/files/'+id+'/contentSize','invalid byte length');continue;}
+   expected.set(id,{sha256:entry.sha256,bytes:count});
+ }
+ if(!Array.isArray(payloads)){fault('/payloads','supply actual byte payloads, not a claimed hash list');payloads=[];}
+ const observed=new Map();
+ for(let i=0;i<payloads.length;i++){
+   const part=payloads[i],name=part?.path;
+   if(!safePath(name)){fault('/payloads/'+i+'/path','unsafe or absent payload path');continue;}
+   if(observed.has(name)){fault('/payloads/'+i+'/path','same payload provided twice');continue;}
+   const whole=part.bytes instanceof Uint8Array;
+   const pieces=Array.isArray(part.chunks)&&part.chunks.length>0&&part.chunks.every(c=>c instanceof Uint8Array);
+   if(whole===pieces||part.bytes!==undefined&&!whole||part.chunks!==undefined&&!pieces){
+     fault('/payloads/'+i+'/bytes','supply exactly one actual Uint8Array/Buffer or nonempty sequence of byte chunks');continue;
+   }
+   if(!expected.has(name)){fault('/payloads/'+i+'/path','unlisted payload cannot be declared verified');continue;}
+   observed.set(name,whole?[part.bytes]:part.chunks);
+ }
+ for(const [path,claim] of expected){
+   const chunks=observed.get(path);
+   if(!chunks){fault('/files/'+path,'declared file content was not supplied');continue;}
+   const digest=createHash('sha256');
+   let byteLength=0;
+   for(const chunk of chunks){digest.update(chunk);byteLength+=chunk.byteLength;}
+   const sha256=digest.digest('hex');
+   if(!Number.isSafeInteger(byteLength)||byteLength!==claim.bytes)fault('/files/'+path+'/contentSize','actual byte length differs from declared receipt');
+   if(sha256!==claim.sha256)fault('/files/'+path+'/sha256','actual byte digest differs from declared receipt');
+   if(byteLength===claim.bytes&&sha256===claim.sha256){
+     readback.push(Object.freeze({path,sha256,bytes:byteLength}));
+   }
+ }
+ if(expected.size===0)fault('/root/hasPart','no valid file receipts to assay');
+ return Object.freeze({kind,ok:errors.length===0,
+   verifiedFiles:Object.freeze(readback),failures:Object.freeze(errors),
+   limit:'Exact supplied-byte integrity only. Does not authenticate the executor, validate scientific claims, grant licenses, prove independent reproduction, or establish public HTTP publication.'});
 }
