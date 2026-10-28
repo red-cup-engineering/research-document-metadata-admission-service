@@ -40,9 +40,29 @@ function projectProcessRun(run,knownPaths){
   if(!named(input.name)||!httpsUrl(input.sourceUrl)||!named(input.version)||/^(unknown|unverified|tbd)$/iu.test(input.version))return refuse('/processRun/tool','real source locator and declared software version are required');
   const agent=isRecord(run.agent)?run.agent:{};
   if(!named(agent.name)||!['Person','Organization'].includes(agent.type))return refuse('/processRun/agent','identify an actual declared executor and its type');
-  const iso=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
-  const instant=x=>named(x)&&iso.test(x)&&Number.isFinite(Date.parse(x));
-  if(!instant(run.startedAt)||!instant(run.endedAt)||Date.parse(run.endedAt)<Date.parse(run.startedAt))return refuse('/processRun/time','source-observed run start/end timestamps with offsets are required');
+  // Date.parse normalizes impossible civil dates (e.g. February 30) into
+  // another day. Such a source clock cannot be admitted as run provenance.
+  const iso=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/u;
+  const instant=x=>{
+    if(!named(x))return null;
+    const parts=iso.exec(x);
+    if(!parts)return null;
+    const year=Number(parts[1]),month=Number(parts[2]),day=Number(parts[3]);
+    const hour=Number(parts[4]),minute=Number(parts[5]),second=Number(parts[6]);
+    const offset=parts[8];
+    const leap=year%4===0&&(year%100!==0||year%400===0);
+    const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+    if(month<1||month>12||day<1||day>days[month-1]||
+      hour>23||minute>59||second>59)return null;
+    if(offset!=='Z'){
+      const offsetHour=Number(offset.slice(1,3)),offsetMinute=Number(offset.slice(4,6));
+      if(offsetHour>23||offsetMinute>59)return null;
+    }
+    const timestamp=Date.parse(x);
+    return Number.isFinite(timestamp)?timestamp:null;
+  };
+  const began=instant(run.startedAt),ended=instant(run.endedAt);
+  if(began===null||ended===null||ended<began)return refuse('/processRun/time','source-observed calendar-valid run start/end timestamps with offsets are required');
   if(!['completed','failed'].includes(run.status))return refuse('/processRun/status','execution disposition must be completed or failed');
   if(run.status==='failed'&&!named(run.error))return refuse('/processRun/error','a failed execution needs its observed error');
   if(run.status==='completed'&&run.error!==undefined)return refuse('/processRun/error','completed execution cannot claim a failure error');

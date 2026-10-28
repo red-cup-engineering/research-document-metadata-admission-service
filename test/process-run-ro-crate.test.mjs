@@ -111,3 +111,24 @@ test('unsupported process identity, status and shape cannot contaminate paper me
   assert.equal(call(null).ok,false);
   assert.equal(call({...run,id:''}).ok,false);
 });
+
+test('calendar-invalid clock evidence is refused instead of normalized to another day',()=>{
+  for(const bad of [
+    '2026-02-29T12:00:00Z',
+    '2026-02-30T12:00:00Z',
+    '2026-06-31T12:00:00Z',
+    '2026-01-01T24:00:00Z',
+    '2026-01-01T00:60:00Z',
+    '2026-01-01T00:00:60Z',
+    '2026-01-01T12:00:00+25:00',
+    '2026-01-01T12:00:00-05:60'
+  ]) {
+    const result=call({...sample(),startedAt:bad});
+    assert.equal(result.ok,false,bad+' must not be admitted as run provenance');
+    assert.equal(result.refusal.issues[0].path,'/processRun/time');
+  }
+  // A real Gregorian leap day with a valid offset remains admissible.
+  const admitted=call({...sample(),startedAt:'2024-02-29T23:58:00-05:00',
+    endedAt:'2024-03-01T00:00:00-05:00'});
+  assert.equal(admitted.ok,true);
+});
