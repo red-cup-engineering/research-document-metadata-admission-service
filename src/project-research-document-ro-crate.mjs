@@ -28,6 +28,48 @@ function httpsUrl(value){
   catch{return false;}
 }
 
+// Date.parse normalizes impossible civil dates (e.g. February 30) into
+// another day. Such a source clock cannot be admitted as run provenance.
+const iso=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/u;
+const instant=x=>{
+  if(!named(x))return null;
+  const parts=iso.exec(x);
+  if(!parts)return null;
+  const year=Number(parts[1]),month=Number(parts[2]),day=Number(parts[3]);
+  const hour=Number(parts[4]),minute=Number(parts[5]),second=Number(parts[6]);
+  const offset=parts[8];
+  const leap=year%4===0&&(year%100!==0||year%400===0);
+  const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+  if(month<1||month>12||day<1||day>days[month-1]||
+    hour>23||minute>59||second>59)return null;
+  if(offset!=='Z'){
+    const offsetHour=Number(offset.slice(1,3)),offsetMinute=Number(offset.slice(4,6));
+    if(offsetHour>23||offsetMinute>59)return null;
+  }
+  const timestamp=Date.parse(x);
+  return Number.isFinite(timestamp)?timestamp:null;
+};
+
+
+/** An explicit RO-Crate publication-date declaration, not source authentication.
+ * The root accepts a calendar-valid ISO 8601 date or a qualified timestamp.
+ */
+function qualifiedPublicationDate(value){
+  if(!named(value))return false;
+  const match=/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/u.exec(value);
+  if(match){
+    const y=Number(match[1]),m=match[2]===undefined?null:Number(match[2]),d=match[3]===undefined?null:Number(match[3]);
+    if(y<1)return false;
+    if(m===null)return true;
+    if(m<1||m>12)return false;
+    if(d===null)return true;
+    const leap=y%4===0&&(y%100!==0||y%400===0);
+    const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+    return d>=1&&d<=days[m-1];
+  }
+  return instant(value)!==null;
+}
+
 /** Project actual supplied computational process evidence into the Process Run Crate
  * 0.6 profile without executing or authenticating a source claim. All run inputs
  * and results refer to separately inventoried payloads in this same crate.
@@ -40,27 +82,6 @@ function projectProcessRun(run,knownPaths){
   if(!named(input.name)||!httpsUrl(input.sourceUrl)||!named(input.version)||/^(unknown|unverified|tbd)$/iu.test(input.version))return refuse('/processRun/tool','real source locator and declared software version are required');
   const agent=isRecord(run.agent)?run.agent:{};
   if(!named(agent.name)||!['Person','Organization'].includes(agent.type))return refuse('/processRun/agent','identify an actual declared executor and its type');
-  // Date.parse normalizes impossible civil dates (e.g. February 30) into
-  // another day. Such a source clock cannot be admitted as run provenance.
-  const iso=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/u;
-  const instant=x=>{
-    if(!named(x))return null;
-    const parts=iso.exec(x);
-    if(!parts)return null;
-    const year=Number(parts[1]),month=Number(parts[2]),day=Number(parts[3]);
-    const hour=Number(parts[4]),minute=Number(parts[5]),second=Number(parts[6]);
-    const offset=parts[8];
-    const leap=year%4===0&&(year%100!==0||year%400===0);
-    const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
-    if(month<1||month>12||day<1||day>days[month-1]||
-      hour>23||minute>59||second>59)return null;
-    if(offset!=='Z'){
-      const offsetHour=Number(offset.slice(1,3)),offsetMinute=Number(offset.slice(4,6));
-      if(offsetHour>23||offsetMinute>59)return null;
-    }
-    const timestamp=Date.parse(x);
-    return Number.isFinite(timestamp)?timestamp:null;
-  };
   const began=instant(run.startedAt),ended=instant(run.endedAt);
   if(began===null||ended===null||ended<began)return refuse('/processRun/time','source-observed calendar-valid run start/end timestamps with offsets are required');
   if(!['completed','failed'].includes(run.status))return refuse('/processRun/status','execution disposition must be completed or failed');
@@ -92,7 +113,7 @@ function projectProcessRun(run,knownPaths){
  * File hash syntax is checked; the digest's correspondence to bytes and
  * the legality/authority of publication require independent receivers.
  */
-export function projectAdmittedResearchRoCrate(admitted,{files,description,sourceUrl,processRun}={}){
+export function projectAdmittedResearchRoCrate(admitted,{files,description,sourceUrl,processRun,datePublished}={}){
   if(!isRecord(admitted)||admitted.ok!==true||!isRecord(admitted.value)){
     return admitted?.ok===false&&admitted.refusal?admitted:refuse('/admitted','original research metadata admission is required');
   }
@@ -102,6 +123,7 @@ export function projectAdmittedResearchRoCrate(admitted,{files,description,sourc
   if(!checked.ok)return checked;
   const m=checked.value;
   if(!named(description))return refuse('/description','substantive description is required');
+  if(datePublished!==undefined&&!qualifiedPublicationDate(datePublished))return refuse('/datePublished','explicit publication date must be a calendar-valid ISO 8601 date or timestamp');
   if(!Array.isArray(files)||files.length===0)return refuse('/files','nonempty measured payload inventory is required');
   if(sourceUrl!==undefined&&!httpsUrl(sourceUrl))return refuse('/sourceUrl','source URL must be an exact absolute HTTPS URL');
   const seen=new Set();
@@ -139,24 +161,37 @@ export function projectAdmittedResearchRoCrate(admitted,{files,description,sourc
     '@id':f.path,'@type':'File',encodingFormat:f.encodingFormat,sha256:f.sha256,
     ...(f.contentSize===undefined?{}:{contentSize:String(f.contentSize)}),
   }));
+  // An intentionally unpublished or rights-unqualified research object may
+  // still carry and verify exact source bytes. Its metadata must not claim
+  // RO-Crate 1.3 or Process Run Crate conformance without required root fields.
+  const missingRootFields=Object.freeze([
+    ...(datePublished===undefined?['datePublished']:[]),
+    ...(!named(m.license)?['license']:[]),
+  ]);
+  const rootFieldsReady=missingRootFields.length===0;
   const root=Object.freeze({
     '@id':'./','@type':'Dataset',name:m.title,description,
     ...(named(m.date_created)?{dateCreated:m.date_created}:{}),
+    ...(datePublished===undefined?{}:{datePublished}),
     ...(named(m.date_modified)?{dateModified:m.date_modified}:{}),
     ...(named(m.license)?{license:m.license}:{}),
     ...(sourceUrl?{isBasedOn:sourceUrl}:{}),
     ...(authors.length?{author:authors.map(a=>ref(a['@id']))}:{}),
     ...(citations.length?{citation:citations.map(a=>ref(a['@id']))}:{}),
     hasPart:payload.map(f=>ref(f['@id'])),
-    ...(execution?{conformsTo:ref(PROCESS_PROFILE),mentions:[ref(execution.runId)]}:{}),
+    ...(execution?{...(rootFieldsReady?{conformsTo:ref(PROCESS_PROFILE)}:{}),mentions:[ref(execution.runId)]}:{}),
   });
   const descriptor=Object.freeze({
     '@id':'ro-crate-metadata.json','@type':'CreativeWork',
-    conformsTo:ref(PROFILE),about:ref('./'),
+    ...(rootFieldsReady?{conformsTo:ref(PROFILE)}:{}),about:ref('./'),
   });
   return Object.freeze({ok:true,value:Object.freeze({
     '@context':CONTEXT,
     '@graph':Object.freeze([descriptor,root,...payload,...authors,...citations,...(execution?execution.entities:[])]),
+  }),profileReadiness:Object.freeze({
+    kind:'research-ro-crate-root-metadata/v1',
+    rootFieldsReady,missingRootFields,
+    standing:'source-declared root metadata only; this is not independent profile validation, publication, source authentication or rights clearance',
   })});
 }
 
@@ -184,7 +219,7 @@ export function verifyResearchRoCratePayloads(projected,payloads=[]){
    limit:'Bytes only; no scientific, identity, publication, licensing or external receiving authority.'});
  const doc=projected?.ok===true?projected.value:projected;
  if(!isRecord(doc)||doc['@context']!==CONTEXT||!Array.isArray(doc['@graph'])){
-   fault('/crate','an original RO-Crate 1.3 JSON-LD graph is required');
+   fault('/crate','original source-profiled research-object JSON-LD inventory is required');
    return Object.freeze({kind,ok:false,verifiedFiles:Object.freeze([]),failures:Object.freeze(errors),
       limit:'Bytes only; no source ownership, publication or independent scientific assurance.'});
  }
@@ -199,8 +234,18 @@ export function verifyResearchRoCratePayloads(projected,payloads=[]){
  if(!isRecord(root)||root['@type']!=='Dataset'||!Array.isArray(root.hasPart)){
    fault('/root','root Dataset must enumerate all files in hasPart');
  }
- if(!isRecord(descriptor)||descriptor.about?.['@id']!=='./'||descriptor.conformsTo?.['@id']!==PROFILE){
-   fault('/descriptor','original RO-Crate metadata descriptor and profile are required');
+ if(!isRecord(descriptor)||descriptor['@type']!=='CreativeWork'||descriptor.about?.['@id']!=='./'||
+     (descriptor.conformsTo!==undefined&&descriptor.conformsTo?.['@id']!==PROFILE)){
+   fault('/descriptor','original research-object descriptor must link the root and may assert only the qualified profile');
+ }
+ // Byte integrity and RO-Crate specification conformance are separate.
+ // A source-addressed candidate may be measured without inventing a release.
+ const completeRoot=qualifiedPublicationDate(root?.datePublished)&&named(root?.license);
+ if(descriptor?.conformsTo!==undefined&&!completeRoot){
+   fault('/descriptor/conformsTo','RO-Crate 1.3 profile claim has missing or invalid root datePublished/license');
+ }
+ if(root?.conformsTo!==undefined&&(root.conformsTo?.['@id']!==PROCESS_PROFILE||!completeRoot)){
+   fault('/root/conformsTo','Process Run profile claim requires the qualified base root metadata');
  }
  const expected=new Map(),refs=Array.isArray(root?.hasPart)?root.hasPart:[];
  for(let i=0;i<refs.length;i++){
