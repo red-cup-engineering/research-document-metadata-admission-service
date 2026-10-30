@@ -36,9 +36,10 @@ test('one observed Process Run is linked from the original RO-Crate dataset',()=
   assert.equal(r.value['@context'],'https://w3id.org/ro/crate/1.3/context');
   const entities=new Map(r.value['@graph'].map(e=>[e['@id'],e]));
   const root=entities.get('./');
-  assert.deepEqual(root.conformsTo,{'@id':'https://w3id.org/ro/wfrun/process/0.6'});
+  assert.equal(root.conformsTo,undefined,
+    'a declared execution cannot certify absent base RO-Crate root metadata');
   assert.deepEqual(root.mentions,[{'@id':'#run-source-run-01'}]);
-  assert.deepEqual(entities.get('ro-crate-metadata.json').conformsTo,{'@id':'https://w3id.org/ro/crate/1.3'});
+  assert.equal(entities.get('ro-crate-metadata.json').conformsTo,undefined);
   const act=entities.get('#run-source-run-01');
   assert.equal(act['@type'],'CreateAction');
   assert.deepEqual(act.instrument,{'@id':'#run-tool'});
@@ -132,3 +133,21 @@ test('calendar-invalid clock evidence is refused instead of normalized to anothe
     endedAt:'2024-03-01T00:00:00-05:00'});
   assert.equal(admitted.ok,true);
 });
+
+test('Process Run profile declaration is conditional on the base RO-Crate root fields',()=>{
+  const completed=call(sample());
+  assert.equal(completed.ok,true);
+  assert.equal(completed.value['@graph'][1].conformsTo,undefined);
+  assert.equal(completed.value['@graph'][1].mentions[0]['@id'],'#run-source-run-01');
+  const accepted=projectResearchDocumentRoCrate(
+    {...metadata,license:'Restricted source, metadata-only sharing'},
+    {description:'Simulated experiment data; no external publication attested',
+     files,processRun:sample(),datePublished:'2026-10-29'});
+  assert.equal(accepted.ok,true);
+  assert.equal(accepted.profileReadiness.rootFieldsReady,true);
+  assert.deepEqual(accepted.value['@graph'][1].conformsTo,
+    {'@id':'https://w3id.org/ro/wfrun/process/0.6'});
+  assert.deepEqual(accepted.value['@graph'][0].conformsTo,
+    {'@id':'https://w3id.org/ro/crate/1.3'});
+});
+
