@@ -120,3 +120,27 @@ test('bad chunk, missing chunk and ambiguous whole plus chunk inputs are refused
   assert.equal(verify(make(),[{path:'observed/preflight.json',chunks:[a,'not-bytes']}]).ok,false);
   assert.equal(verify(make(),[{path:'observed/preflight.json',bytes,chunks:[a,b]}]).ok,false);
 });
+
+test('byte consistency can pass without a false RO-Crate profile declaration',()=>{
+  const candidate=make();
+  assert.equal(candidate.ok,true);
+  assert.equal(candidate.value['@graph'][0].conformsTo,undefined);
+  assert.deepEqual(candidate.profileReadiness.missingRootFields,['datePublished','license']);
+  assert.equal(verify(candidate,payload()).ok,true);
+});
+test('forged complete-profile claims are refused even when payload checksums match',()=>{
+  const original=make().value;
+  const [descriptor,root,...rest]=original['@graph'];
+  const falseProfile={...original,'@graph':[
+    {...descriptor,conformsTo:{'@id':'https://w3id.org/ro/crate/1.3'}},
+    root,...rest,
+  ]};
+  const result=verify(falseProfile,payload());
+  assert.equal(result.ok,false);
+  assert.ok(result.failures.some(f=>f.path==='/descriptor/conformsTo'));
+  const falseProcess={...original,'@graph':[
+    descriptor,{...root,conformsTo:{'@id':'https://w3id.org/ro/wfrun/process/0.6'}},...rest,
+  ]};
+  assert.equal(verify(falseProcess,payload()).ok,false);
+});
+
