@@ -24,9 +24,10 @@ test('native metadata admission produces a bounded RO-Crate 1.3 manuscript packa
   assert.equal(r.value['@context'],'https://w3id.org/ro/crate/1.3/context');
   const [descriptor,root,first,second,author,citation]=r.value['@graph'];
   assert.deepEqual(descriptor,{
-    '@id':'ro-crate-metadata.json','@type':'CreativeWork',
-    conformsTo:{'@id':'https://w3id.org/ro/crate/1.3'},about:{'@id':'./'},
+    '@id':'ro-crate-metadata.json','@type':'CreativeWork',about:{'@id':'./'},
   });
+  assert.equal(r.profileReadiness.rootFieldsReady,false);
+  assert.deepEqual(r.profileReadiness.missingRootFields,['datePublished','license']);
   assert.equal(root['@id'],'./');
   assert.equal(root['@type'],'Dataset');
   assert.equal(root.name,paper.title);
@@ -73,3 +74,39 @@ test('unsafe / unmeasured payloads and unsupported public claims refuse',()=>{
   assert.equal(project(valid,{...options,description:''}).ok,false);
   assert.equal(fromMetadata({...paper,cites_external:[{key:'a',title:'X'},{key:'a',title:'Y'}]},options).ok,false);
 });
+
+test('unpublished research remains a byte-addressable candidate, not a falsely conformant crate',()=>{
+  const r=fromMetadata(paper,options);
+  assert.equal(r.ok,true);
+  assert.equal(r.value['@graph'][0].conformsTo,undefined);
+  assert.equal(r.value['@graph'][1].datePublished,undefined);
+  assert.deepEqual(r.profileReadiness.missingRootFields,['datePublished','license']);
+  const stillLicensed=fromMetadata({...paper,license:'Restricted; original community consent required'},options);
+  assert.equal(stillLicensed.ok,true);
+  assert.deepEqual(stillLicensed.profileReadiness.missingRootFields,['datePublished']);
+  assert.equal(stillLicensed.value['@graph'][0].conformsTo,undefined);
+});
+test('explicit, civil-calendar-valid date and declared rights qualify only the source profile marker',()=>{
+  const m={...paper,license:'Restricted: permission from original owner required'};
+  for(const datePublished of ['2017','2024-02-29','2026-10-29T00:00:00Z']){
+    const r=fromMetadata(m,{...options,datePublished});
+    assert.equal(r.ok,true);
+    assert.equal(r.profileReadiness.rootFieldsReady,true);
+    assert.deepEqual(r.profileReadiness.missingRootFields,[]);
+    assert.equal(r.value['@graph'][1].datePublished,datePublished);
+    assert.deepEqual(r.value['@graph'][0].conformsTo,{'@id':'https://w3id.org/ro/crate/1.3'});
+    assert.equal(r.value['@graph'][1].license,m.license);
+    assert.match(r.profileReadiness.standing,/not independent profile validation/);
+  }
+  assert.equal(fromMetadata(paper,{...options,datePublished:'2026-10-29'}).value['@graph'][0].conformsTo,undefined);
+});
+test('invalid and retroactively fabricated source publication dates refuse instead of normalizing',()=>{
+  for(const datePublished of ['2026-02-29','2026-02-30','2026-00-01',
+    '2026-13-01','2026-10-00','2026-01-01T24:00:00Z','2026-01-01T00:00:60Z',
+    'not-a-publication-date',null,4]){
+    const r=fromMetadata({...paper,license:'Source rights declaration'}, {...options,datePublished});
+    assert.equal(r.ok,false,String(datePublished));
+    assert.equal(r.refusal.issues[0].path,'/datePublished');
+  }
+});
+
