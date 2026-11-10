@@ -125,3 +125,7 @@ The output uses the original [RO-Crate 1.3](https://www.researchobject.org/ro-cr
 The existing `verifyResearchRoCratePayloads` independently accepts an exact-byte candidate **without** a 1.3 profile claim, but refuses a descriptor or Process Run profile marker if mandatory root fields are missing. It still verifies only actual supplied bytes and preserved file identities; it must not promote a passing byte assay into a standards or publication certificate.
 
 The output uses [RO-Crate 1.3](https://www.researchobject.org/ro-crate/specification/1.3/) descriptor, Dataset, File, Person and CreativeWork nodes. Published DOI, license, published date or public URL are **not fabricated**; only explicitly declared metadata is projected. A passing source test never asserts Science/editorial acceptance or an installed public publisher. This service provides reusable **research metadata**. For actual artifact creation reuse [Red Cup's Pandoc projector](https://github.com/red-cup-engineering/project-document-through-pandoc-service); public release and syndication remain with [Causeway Public Web](https://github.com/causeway-services/public-web-services-section/blob/main/sites/README.md).
+
+## Acceptance
+
+Run `npm test` for the source suite. The [API reference](docs/API.md) links the source refusal and [runnable consumer example](examples/quickstart.test.mjs).

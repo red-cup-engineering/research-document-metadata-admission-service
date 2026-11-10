@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "basis": "Preserve the original collision rules for source-admitted research citation keys.",
+  "cases": [
+    {
+      "id": "RESEARCH-CITATION-REFUSAL",
+      "role": "source",
+      "kind": "refusal",
+      "claim": "The citation key operation refuses an author input that is a scalar rather than a list.",
+      "file": "test/archive-citations-receiving.test.mjs",
+      "test": "collision suffixes carry the original a-z, aa algorithm"
+    },
+    {
+      "id": "RESEARCH-CITATION-QUICKSTART",
+      "role": "consumer",
+      "kind": "example",
+      "claim": "An installed caller receives the first available suffix for an occupied citation key.",
+      "file": "examples/quickstart.test.mjs"
+    }
+  ]
+}
