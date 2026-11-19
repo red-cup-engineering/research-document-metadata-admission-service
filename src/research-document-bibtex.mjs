@@ -3,7 +3,7 @@
  * at 3c69d5cf9d3bec484f1dc22067ed9623b1bab7c6.
  * Consumes the existing admitted research-document metadata; never parses Markdown.
  */
-import { admitResearchDocumentMetadata } from "./research-document-metadata.mjs";
+import { validateResearchDocumentMetadata } from "./research-document-metadata.mjs";
 const TYPES=new Set(["article","book","booklet","inbook","incollection","inproceedings","manual",
   "mastersthesis","phdthesis","thesis","misc","proceedings","techreport","report","unpublished",
   "online","software","dataset","patent","inreference"]);
@@ -71,7 +71,7 @@ export function renderResearchDocumentBibtex(records){
   if(!Array.isArray(records))throw new TypeError("records must be an array");
   const cited=new Map();
   for(const record of records){
-    const admiss=admitResearchDocumentMetadata(record);
+    const admiss=validateResearchDocumentMetadata(record);
     if(!admiss.ok)throw new TypeError("research document metadata refused");
     for(const citation of admiss.value.cites_external){
       const prev=cited.get(citation.key);

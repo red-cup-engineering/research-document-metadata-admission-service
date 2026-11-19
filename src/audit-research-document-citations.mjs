@@ -1,4 +1,4 @@
-import { admitResearchDocumentMetadata } from "./research-document-metadata.mjs";
+import { validateResearchDocumentMetadata } from "./research-document-metadata.mjs";
 
 /**
  * Observe an explicit, already-decoded research-document set. This does not
@@ -8,10 +8,10 @@ import { admitResearchDocumentMetadata } from "./research-document-metadata.mjs"
  */
 export function auditResearchDocumentCitations(records) {
   if (!Array.isArray(records)) throw new TypeError("records must be an array of decoded metadata objects");
-  const admitted = records.map(record => admitResearchDocumentMetadata(record));
-  const invalid = admitted.flatMap((entry, index) => entry.ok ? [] :
+  const validated = records.map(record => validateResearchDocumentMetadata(record));
+  const invalid = validated.flatMap((entry, index) => entry.ok ? [] :
     [Object.freeze({ index, refusal: entry.refusal })]);
-  const entries = admitted.flatMap((entry, index) => entry.ok ?
+  const entries = validated.flatMap((entry, index) => entry.ok ?
     [{ index, document: entry.value }] : []);
   const grouped = new Map();
   for (const entry of entries) {

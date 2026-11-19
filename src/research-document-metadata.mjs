@@ -11,7 +11,7 @@ export const RESEARCH_DOCUMENT_TYPES = Object.freeze([
 ]);
 
 const accepted = (value) => Object.freeze({ ok: true, value: Object.freeze(value) });
-const refused = (issues) => Object.freeze({ ok: false, refusal: Object.freeze({ code: "invalid-research-document-metadata", issues: Object.freeze(issues) }) });
+const rejected = (issues) => Object.freeze({ ok: false, refusal: Object.freeze({ code: "invalid-research-document-metadata", issues: Object.freeze(issues) }) });
 const issue = (path, message) => Object.freeze({ path, message });
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const strings = (value) => Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim() !== "");
@@ -82,8 +82,8 @@ function normalizedCitations(citations = []) {
  * Markdown envelope belongs to markdown data, while these meanings belong to
  * document data.
  */
-export function admitResearchDocumentMetadata(input) {
-  if (!isObject(input)) return refused([issue("/", "metadata must be an object")]);
+export function validateResearchDocumentMetadata(input) {
+  if (!isObject(input)) return rejected([issue("/", "metadata must be an object")]);
   const issues = [];
   if (typeof input.id !== "string" || !IDENTIFIER.test(input.id)) issues.push(issue("/id", "must be a lowercase dotted-or-hyphenated identifier"));
   if (typeof input.title !== "string" || input.title.trim() === "") issues.push(issue("/title", "must be a nonempty string"));
@@ -93,7 +93,7 @@ export function admitResearchDocumentMetadata(input) {
   for (const key of ["date_created", "date_modified"]) checkDate(input, key, issues);
   checkDefinitions(input, issues);
   checkExternalCitations(input, issues);
-  if (issues.length > 0) return refused(issues);
+  if (issues.length > 0) return rejected(issues);
   return accepted({
     id: input.id, title: input.title,
     status: input.status ?? "draft",
