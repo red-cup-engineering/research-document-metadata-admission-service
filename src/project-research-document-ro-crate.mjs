@@ -1,3 +1,4 @@
+import { isRecord } from "@red-cup-engineering/signcell/values";
 /**
  * A pure RO-Crate 1.3 JSON-LD projection of metadata admitted by the owning
  * research-document metadata service. Sources and SHA-256 values are supplied
@@ -12,7 +13,7 @@ const PROFILE='https://w3id.org/ro/crate/1.3';
 const PROCESS_PROFILE='https://w3id.org/ro/wfrun/process/0.6';
 const CONTEXT=PROFILE+'/context';
 const HASH=/^[a-f0-9]{64}$/u;
-const isRecord=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+
 const named=x=>typeof x==='string'&&x.trim().length>0;
 const ref=id=>Object.freeze({'@id':id});
 const refuse=(path,message)=>Object.freeze({ok:false,refusal:Object.freeze({

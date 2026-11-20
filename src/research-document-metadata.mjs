@@ -1,3 +1,4 @@
+import { isRecord } from "@red-cup-engineering/signcell/values";
 const IDENTIFIER = /^[a-z0-9.-]+$/u;
 
 export const RESEARCH_DOCUMENT_STATUSES = Object.freeze([
@@ -13,7 +14,7 @@ export const RESEARCH_DOCUMENT_TYPES = Object.freeze([
 const accepted = (value) => Object.freeze({ ok: true, value: Object.freeze(value) });
 const refused = (issues) => Object.freeze({ ok: false, refusal: Object.freeze({ code: "invalid-research-document-metadata", issues: Object.freeze(issues) }) });
 const issue = (path, message) => Object.freeze({ path, message });
-const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
 const strings = (value) => Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim() !== "");
 const copyStrings = (value) => Object.freeze([...(value ?? [])]);
 
@@ -35,7 +36,7 @@ function checkDefinitions(input, issues) {
   }
   input.defines.forEach((definition, index) => {
     const path = `/defines/${index}`;
-    if (!isObject(definition)) return issues.push(issue(path, "must be an object"));
+    if (!isRecord(definition)) return issues.push(issue(path, "must be an object"));
     if ("term_id" in definition || "definition" in definition) issues.push(issue(path, "uses replaced fields; use id and description"));
     if (typeof definition.id !== "string" || !IDENTIFIER.test(definition.id)) issues.push(issue(`${path}/id`, "must be a lowercase dotted-or-hyphenated identifier"));
     if (typeof definition.label !== "string" || definition.label.trim() === "") issues.push(issue(`${path}/label`, "must be a nonempty string"));
@@ -52,12 +53,12 @@ function checkExternalCitations(input, issues) {
   }
   input.cites_external.forEach((citation, index) => {
     const path = `/cites_external/${index}`;
-    if (!isObject(citation)) return issues.push(issue(path, "must be an object"));
+    if (!isRecord(citation)) return issues.push(issue(path, "must be an object"));
     if (typeof citation.key !== "string" || citation.key.trim() === "") issues.push(issue(`${path}/key`, "must be a nonempty string"));
     if (typeof citation.title !== "string" || citation.title.trim() === "") issues.push(issue(`${path}/title`, "must be a nonempty string"));
     if (citation.authors !== undefined && !strings(citation.authors)) issues.push(issue(`${path}/authors`, "must be an array of nonempty strings"));
     for (const key of ["year", "venue", "doi", "url"]) if (citation[key] !== undefined && typeof citation[key] !== "string" && !(key === "year" && Number.isInteger(citation[key]))) issues.push(issue(`${path}/${key}`, "must be a string"));
-    if (citation.extra !== undefined && !isObject(citation.extra)) issues.push(issue(`${path}/extra`, "must be an object"));
+    if (citation.extra !== undefined && !isRecord(citation.extra)) issues.push(issue(`${path}/extra`, "must be an object"));
   });
 }
 
@@ -83,7 +84,7 @@ function normalizedCitations(citations = []) {
  * document data.
  */
 export function admitResearchDocumentMetadata(input) {
-  if (!isObject(input)) return refused([issue("/", "metadata must be an object")]);
+  if (!isRecord(input)) return refused([issue("/", "metadata must be an object")]);
   const issues = [];
   if (typeof input.id !== "string" || !IDENTIFIER.test(input.id)) issues.push(issue("/id", "must be a lowercase dotted-or-hyphenated identifier"));
   if (typeof input.title !== "string" || input.title.trim() === "") issues.push(issue("/title", "must be a nonempty string"));
