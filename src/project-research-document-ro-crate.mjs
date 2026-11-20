@@ -5,7 +5,7 @@
  * No DOI, publication, rights approval or ActivityPub delivery is inferred.
  * Specification: https://www.researchobject.org/ro-crate/specification/1.3/
  */
-import { validateResearchDocumentMetadata } from './research-document-metadata.mjs';
+import { admitResearchDocumentMetadata } from './research-document-metadata.mjs';
 import { createHash } from 'node:crypto';
 
 const PROFILE='https://w3id.org/ro/crate/1.3';
@@ -113,13 +113,13 @@ function projectProcessRun(run,knownPaths){
  * File hash syntax is checked; the digest's correspondence to bytes and
  * the legality/authority of publication require independent receivers.
  */
-export function projectValidatedResearchRoCrate(validated,{files,description,sourceUrl,processRun,datePublished}={}){
-  if(!isRecord(validated)||validated.ok!==true||!isRecord(validated.value)){
-    return validated?.ok===false&&validated.refusal?validated:refuse('/admitted','original research metadata admission is required');
+export function projectAdmittedResearchRoCrate(admitted,{files,description,sourceUrl,processRun,datePublished}={}){
+  if(!isRecord(admitted)||admitted.ok!==true||!isRecord(admitted.value)){
+    return admitted?.ok===false&&admitted.refusal?admitted:refuse('/admitted','original research metadata admission is required');
   }
-  const record=validated.value;
+  const record=admitted.value;
   // Re-admit the purported value rather than trusting a caller-supplied ok flag.
-  const checked=validateResearchDocumentMetadata(record);
+  const checked=admitResearchDocumentMetadata(record);
   if(!checked.ok)return checked;
   const m=checked.value;
   if(!named(description))return refuse('/description','substantive description is required');
@@ -197,7 +197,7 @@ export function projectValidatedResearchRoCrate(validated,{files,description,sou
 
 /** Convenience entry for decoded document metadata; owns no carrier parser. */
 export function projectResearchDocumentRoCrate(metadata, options={}){
-  return projectValidatedResearchRoCrate(validateResearchDocumentMetadata(metadata),options);
+  return projectAdmittedResearchRoCrate(admitResearchDocumentMetadata(metadata),options);
 }
 
 

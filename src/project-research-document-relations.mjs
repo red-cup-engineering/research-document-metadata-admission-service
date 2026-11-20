@@ -1,4 +1,4 @@
-import { validateResearchDocumentMetadata } from "./research-document-metadata.mjs";
+import { admitResearchDocumentMetadata } from "./research-document-metadata.mjs";
 
 function authorId(name) {
   return name.toLocaleLowerCase("en-US").replaceAll(/[.,'"]/gu, "").replaceAll(/\s+/gu, "-").replaceAll(/[^a-z0-9-]/gu, "").replaceAll(/-+/gu, "-").replaceAll(/^-|-$/gu, "");
@@ -12,9 +12,9 @@ const relation = (subject, predicate, object) => Object.freeze({ subject, predic
  * or assertion of truth. A SignCell/graph receiver may admit them separately.
  */
 export function projectResearchDocumentRelations(input) {
-  const validated = validateResearchDocumentMetadata(input);
-  if (!validated.ok) return validated;
-  const metadata = validated.value;
+  const admitted = admitResearchDocumentMetadata(input);
+  if (!admitted.ok) return admitted;
+  const metadata = admitted.value;
   const subject = `document:${metadata.id}`;
   const relations = [
     relation(subject, "document:has-title", metadata.title),
