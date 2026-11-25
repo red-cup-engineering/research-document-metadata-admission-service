@@ -7,7 +7,7 @@ import { isRecord } from "@red-cup-engineering/signcell/values";
  * Specification: https://www.researchobject.org/ro-crate/specification/1.3/
  */
 import { admitResearchDocumentMetadata } from './research-document-metadata.mjs';
-import { createHash } from 'node:crypto';
+import { sha256Hex } from "@red-cup-engineering/semiotic-content-address-system";
 
 const PROFILE='https://w3id.org/ro/crate/1.3';
 const PROCESS_PROFILE='https://w3id.org/ro/wfrun/process/0.6';
@@ -282,10 +282,9 @@ export function verifyResearchRoCratePayloads(projected,payloads=[]){
  for(const [path,claim] of expected){
    const chunks=observed.get(path);
    if(!chunks){fault('/files/'+path,'declared file content was not supplied');continue;}
-   const digest=createHash('sha256');
    let byteLength=0;
-   for(const chunk of chunks){digest.update(chunk);byteLength+=chunk.byteLength;}
-   const sha256=digest.digest('hex');
+   for(const chunk of chunks)byteLength+=chunk.byteLength;
+   const sha256=sha256Hex(Buffer.concat(chunks));
    if(!Number.isSafeInteger(byteLength)||byteLength!==claim.bytes)fault('/files/'+path+'/contentSize','actual byte length differs from declared receipt');
    if(sha256!==claim.sha256)fault('/files/'+path+'/sha256','actual byte digest differs from declared receipt');
    if(byteLength===claim.bytes&&sha256===claim.sha256){
