@@ -3,6 +3,7 @@
  * at 3c69d5cf9d3bec484f1dc22067ed9623b1bab7c6.
  * Consumes the existing admitted research-document metadata; never parses Markdown.
  */
+import { coincides } from "@red-cup-engineering/semiotic-content-address-system";
 import { admitResearchDocumentMetadata } from "./research-document-metadata.mjs";
 const TYPES=new Set(["article","book","booklet","inbook","incollection","inproceedings","manual",
   "mastersthesis","phdthesis","thesis","misc","proceedings","techreport","report","unpublished",
@@ -62,9 +63,9 @@ function one(citation){
   if(lines.length>1)lines[lines.length-1]=lines.at(-1).slice(0,-1);
   return lines.join("\n")+"\n}\n";
 }
-function fingerprint(c){
+function citationShape(c){
   const f=sortedFields(c);
-  return JSON.stringify([c.extra?.type??"misc",[...f].sort(([a],[b])=>a.localeCompare(b))]);
+  return [c.extra?.type??"misc",[...f].sort(([a],[b])=>a.localeCompare(b))];
 }
 /** One deterministic BibTeX projection of an explicit set of document records. */
 export function renderResearchDocumentBibtex(records){
@@ -75,7 +76,7 @@ export function renderResearchDocumentBibtex(records){
     if(!admiss.ok)throw new TypeError("research document metadata refused");
     for(const citation of admiss.value.cites_external){
       const prev=cited.get(citation.key);
-      if(prev && fingerprint(prev)!==fingerprint(citation))
+      if(prev && !coincides(citationShape(prev),citationShape(citation)))
         throw new TypeError("conflicting declarations of citation key "+citation.key);
       if(!prev)cited.set(citation.key,citation);
     }
